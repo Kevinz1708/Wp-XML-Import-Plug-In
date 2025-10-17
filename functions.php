@@ -5,9 +5,9 @@
  * Version: 0.1.0
  */
 
-if (!defined('ASBATH')) exit;
+if (!defined('ABSPATH')) exit;
 
-const Sxi_OPT_PROFILE = 'sxi_profile';
+const SXI_OPT_PROFILE = 'sxi_profile';
 const SXI_CRON_HOOK = 'sxi_cron_event';
 
 add_action('admin_menu', function() {
@@ -35,19 +35,24 @@ function sxi_fetch($url){
     return false;
 }
 
-function sxi_xml_items($xml_string, $items_path): array {
-    libxml_use_internal_errors(true);
-    $xml = simplexml_load_file($xml_string, 'SimpleXMLElement', LIBXML_NOCDATA);
-    if ($xml===false) return [];
-    $arr = json_decode(json_decode($xml), true);
-    $cur = $arr;
-    foreach (explode('.', (string)$items_path) as $part){
-        if ($part=== '') continue;
-        if (!is_array($cur) || !array_key_exists($part,$cur)) return [];
-        $cur = $cur[$part];
+function sxi_xml_items($xml_string, $items_path) : array {
+    libxml_use_internal_errors(ture);
+    $xml = simplexml_load_string($xml_string, 'SimpleXMLElement', LIBXML_NOCDATA);
+    if ($xml === false) return [];
+
+    $arr = json_decode(json_encode($xml), true);
+
+    $curr = $arr;
+    foreach (explode('.' (string)$items_path) as $part) {
+        if (part === '') continue;
+        if (!is_array($cur) || !array_key_exists($part, $curr)) {
+            return [];
+        }
+        $curr = $curr[$part];
     }
-    return isset($cur[0]) ? $cur : [$cur];
+    return isset($curr[0]) ? $curr : [$curr];
 }
+
 
 function sxi_import(array $o): array {
     $xml = sxi_fetch($o ['feed_url']);
@@ -56,10 +61,10 @@ function sxi_import(array $o): array {
     return ['ok'=>true, 'count'=>count($items)];
 }
 
-add_action('rest_api_init', function() {
-    register_rest_route('sxi/v0', 'run', [
-        'methods'=>'POST',
-        'callback'=>function(){ return ['ok'=>true]; },
-        'permission_callback'=>'_return_true'
+add_action('rest_api_innit', function() {
+    register_rest_route ('sxi/v0', '/run' [
+        'methods' => 'POST',
+        'callback' => function() {return ['ok' => true];},
+        'permission_callback' => '__return_true',
     ]);
 });
