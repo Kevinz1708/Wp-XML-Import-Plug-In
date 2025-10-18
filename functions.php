@@ -19,11 +19,22 @@ function sxi_defaults():array {
         'feed_url' => '',
         'items_path' => '',
         'post_type' => 'post',
+
+        'id_path' => 'id',
+        'title_path' => 'title',
+        'content_path' => 'description',
+
+        'mapping'=> [],
+        'post_status' => 'publish',
+
+        'overwrite_meta' => false,
+        'append_lists' => true,
+        'overwrite_title_content' => false,
     ];
 }
 
 function sxi_admin_page() {
-    if (!current_use_can('manage_options')) return; 
+    if (!current_user_can('manage_options')) return;
 
     $p = wp_parse_args(get_option(SXI_OPT_PROFILE, []), sxi_defaults());
 
@@ -33,6 +44,17 @@ function sxi_admin_page() {
         $p['feed_url'] = esc_url_raw(wp_unslash)($_POST['feed_url'] ?? '');
         $p['items_path'] = sanitize_text_field(wp_unslash($_POST['items_path'] ?? ''));
         $p['post_type'] = sanitize_text_field(wp_unslash($_POST['post_type'] ?? 'post'));
+
+        $p['id_path'] = sanitize_text_field(wp_unslash($_POST['id_path'] ?? 'id_path'));
+        $p['title_path'] = sanitize_text_field(wp_unslash($_POST['title_path'] ?? 'title_path'));
+        $p['content_path'] = sanitize_text_field(wp_unslash($_POST['content_path'] ?? 'content_path'));
+
+        $map_arr = json_decode(wp_unslash($_POST['mapping'] ?? '[]'), true);
+        $p['mapping'] = is_array($map_arr) ? $map_arr : [];
+
+        $p['overwrite_meta'] = !empty($_POST['overwrite_meta']);
+        $p['append_lists'] = !empty($_POST['append_lists']);
+        $p['overwrite_title_content'] = !empty($_POST['overwrite_title_content']);
 
         update_option(SXI_OPT_PROFILE, $p , false);
         echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>'
@@ -61,6 +83,8 @@ function sxi_admin_page() {
             <th><label for="post_type">Post type</label></th>
             <td><input type="text" name="post_type" id="post_type" value="<?php echo esc_attr($p['post_type']); ?>"></td>
           </tr>
+
+          
         </table>
          <p style="margin-top:10px;">
           <button class="button button-primary" name="sxi_action" value="save">Save</button>
