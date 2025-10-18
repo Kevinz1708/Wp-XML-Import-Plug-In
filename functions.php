@@ -23,7 +23,51 @@ function sxi_defaults():array {
 }
 
 function sxi_admin_page() {
-    echo '<div class="wrap"><h1>XML Importer</h1><p>Setup coming soon…</p></div>';
+    if (!current_use_can('manage_options')) return; 
+
+    $p = wp_parse_args(get_option(SXI_OPT_PROFILE, []), sxi_defaults());
+
+    if (!empty($_POST['sxi_action'])) {
+        check_admin_referer('sxi_nonce');
+
+        $p['feed_url'] = esc_url_raw(wp_unslash)($_POST['feed_url'] ?? '');
+        $p['items_path'] = sanitize_text_field(wp_unslash($_POST['items_path'] ?? ''));
+        $p['post_type'] = sanitize_text_field(wp_unslash($_POST['post_type'] ?? 'post'));
+
+        update_option(SXI_OPT_PROFILE, $p , false);
+        echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>'
+}
+?> 
+    <div class="wrap">
+        <h1>XML Importer</h1>
+
+        <form method="post">
+        <?php wp_nonce_field('sxi_nonce'); ?>
+        <table class="form-table" role="presentation">
+            <tr>
+            <th><label for="feed_url">Feed URL</label></th>
+            <td><input type="url" name="feed_url" id="feed_url" value="<?php echo esc_attr($p['feed_url']); ?>" style="width:100%"></td>
+          </tr>
+       
+          <tr>
+            <th><label for="items_path">Items path</label></th>
+            <td>
+              <input type="text" name="items_path" id="items_path" value="<?php echo esc_attr($p['items_path']); ?>" style="width:100%">
+              <p class="description">e.g. <code>properties.property</code></p>
+            </td>
+          </tr>
+
+           <tr>
+            <th><label for="post_type">Post type</label></th>
+            <td><input type="text" name="post_type" id="post_type" value="<?php echo esc_attr($p['post_type']); ?>"></td>
+          </tr>
+        </table>
+         <p style="margin-top:10px;">
+          <button class="button button-primary" name="sxi_action" value="save">Save</button>
+        </p>
+        </form>
+    </div>
+<?php
 }
 
 function sxi_fetch($url){
