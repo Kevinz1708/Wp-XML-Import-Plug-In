@@ -136,3 +136,43 @@ add_action('rest_api_innit', function() {
         'permission_callback' => '__return_true',
     ]);
 });
+
+function sxi_find_post($external_id, $post_type) : int {
+    $q = new WP_Query([
+        'post_type' => $post_type,
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'meta_query' => [['key' => '_sxi_external_id', 'value' => (string)$external_id]],
+        
+
+    ]);
+    return $q->have_posts() ? (int)$q->posts[0] : 0;
+}
+
+function sxi_to_list($v) : array {
+    if (is_array($v)) return array_values(array_map('strval', $v));
+    if (is_string($v)) {
+        $dec = json_decode($v, true);
+        if (is_array($dec)) return array_values(array_map('strval', $dec));
+        if (strpos($v, ',') !== false) return array_values(array_map ('trim', explode(',', $v)));
+        return [$v];
+
+    }
+    return [$v];
+}
+
+function sxi_save_meta(int $post_id, string $key, $new, bool $overwrite, bool $append_lists) {
+    $cur = get_post_meta($post_id, $key, true);
+    if ($overwrite) {update_post_meta($post_id, $key, $new); return;}
+    if ($cur !== '' && $cur !== null) {
+        if ($append_lists) {
+            $merged = array_values (array_unique(array_merge(sxi_to_list($cur), sxi_to_list($new))));
+            update_post_meta($post_id, $key, wp_json_encode($merged));
+        }
+        return;
+    }
+    update_post_meta($post_id, $key, $new);
+}
+
+?>
