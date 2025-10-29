@@ -133,21 +133,21 @@ function sxi_fetch($url){
 }
 
 function sxi_xml_items($xml_string, $items_path) : array {
-    libxml_use_internal_errors(ture);
+    libxml_use_internal_errors(true);
     $xml = simplexml_load_string($xml_string, 'SimpleXMLElement', LIBXML_NOCDATA);
     if ($xml === false) return [];
 
     $arr = json_decode(json_encode($xml), true);
 
-    $curr = $arr;
-    foreach (explode('.' (string)$items_path) as $part) {
-        if (part === '') continue;
-        if (!is_array($cur) || !array_key_exists($part, $curr)) {
+    $cur = $arr;
+    foreach (explode('.', (string)$items_path) as $part) {
+        if ($part === '') continue;
+        if (!is_array($cur) || !array_key_exists($part, $cur)) {
             return [];
         }
-        $curr = $curr[$part];
+        $cur = $cur[$part];
     }
-    return isset($curr[0]) ? $curr : [$curr];
+    return isset($crr[0]) ? $cur : [$cur];
 }
 
 
