@@ -84,7 +84,36 @@ function sxi_admin_page() {
             <td><input type="text" name="post_type" id="post_type" value="<?php echo esc_attr($p['post_type']); ?>"></td>
           </tr>
 
-          
+          <tr>
+            <th><label for="id_path">External ID Path</label></th>
+            <td><input type="text" name="id_path" id="id_path" value="<?php echo esc_attr($p['id_path']); ?>"></td>
+          </tr>
+
+          <tr>
+            <th><label for="title.path">Title Path</label></th>
+            <td><input type="text" name="title_path" id="title_path" value="<?php echo esc_attr($p['title_path']); ?>"></td>
+          </tr>
+
+          <tr>
+            <td><label for="content_path">Content Path</label></td>
+            <td><input type="text" name="content_path" id="content_path" value="<?php echo esc_attr($p['content_path']); ?>"></td>
+          </tr>
+
+            <tr>
+                <th><label for="mapping">Field Mapping (JSON)</label></th>
+                <td>
+                <textarea name="mapping" id="mapping" rows="6"><?php echo esc_textarea(wp_json_encode($p['mapping'], JSON_PRETTY_PRINT)); ?></textarea>
+                </td>
+            </tr>
+
+            <tr>
+                <th>Update Rules</th>
+                <td>
+                    <label><input type="checkbox" name="overwrite_meta" <?php checked($p['overwrite_meta']); ?>> Overwrite existing meta values</label><br>
+                    <label><input type="checkbox" name="append_lists" <?php checked($p['append_lists']); ?>> Append to list-type meta fields</label><br>
+                    <label><input type="checkbox" name="overwrite_title_content" <?php checked($p['overwrite_title_content']); ?>> Overwrite title and content</label>
+                </td>
+
         </table>
          <p style="margin-top:10px;">
           <button class="button button-primary" name="sxi_action" value="save">Save</button>
@@ -128,6 +157,8 @@ function sxi_import(array $o): array {
     $items = sxi_xml_items($xml, $o['items_path']);
     return ['ok'=>true, 'count'=>count($items)];
 }
+
+
 
 add_action('rest_api_innit', function() {
     register_rest_route ('sxi/v0', '/run' [
