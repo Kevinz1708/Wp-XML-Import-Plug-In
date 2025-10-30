@@ -118,6 +118,18 @@ function sxi_admin_page() {
          <p style="margin-top:10px;">
           <button class="button button-primary" name="sxi_action" value="save">Save</button>
         </p>
+
+        <p>
+            <button class="button" name="sxi_action" value="run_now">Run Now</button>
+        </p>
+        <?php
+        if (!empty($_POST['sxi_action']) && $_POST['sxi_action'] === 'run_now') {
+            check_admin_referer('sxi_nonce');
+            $r = sxi_import($p);
+            echo '<pre style="white-space:pre;max-height:240px;overflow:auto;background:#111;color:#0f0;padding:10px;">'
+            . esc_html(json_encode($r, JSON_PRETTY_PRINT)) . '</pre>';
+        }
+        ?>
         </form>
     </div>
 <?php
@@ -160,10 +172,10 @@ function sxi_import(array $o): array {
 
 
 
-add_action('rest_api_innit', function() {
-    register_rest_route ('sxi/v0', '/run' [
+add_action('rest_api_init', function() {
+    register_rest_route ('sxi/v0', '/run', [
         'methods' => 'POST',
-        'callback' => function() {return ['ok' => true];},
+        'callback' => function() {return ['ok' => true]; },
         'permission_callback' => '__return_true',
     ]);
 });
