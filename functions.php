@@ -57,9 +57,9 @@ function sxi_admin_page() {
         $p['overwrite_title_content'] = !empty($_POST['overwrite_title_content']);
 
         update_option(SXI_OPT_PROFILE, $p , false);
-        echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>'
-}
-?> 
+        echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>';
+    }
+?>
     <div class="wrap">
         <h1>XML Importer</h1>
 
@@ -218,4 +218,33 @@ function sxi_save_meta(int $post_id, string $key, $new, bool $overwrite, bool $a
     update_post_meta($post_id, $key, $new);
 }
 
+function sxi_first($arr, $path) {
+    $cur = $arr;
+    foreach (explode('.', (string)$path) as $p) {
+        if (!is_array($cur) || !array_key_exists($p, $cur)) return null;
+        $cur = $cur[$p];
+    }
+    if (is_array($cur)) {
+        foreach ($cur as $v) if (!is_array($v) && $v !== '') return (string)$v;
+        return null;
+    }
+    return $cur === '' ? null : (string)$cur;
+}
+
+function sxi_collect_values($arr, $path): array {
+    $cur = $arr;
+    foreach (explode('.', (string)$path) as $p) {
+        if (!is_array($cur) || !array_key_exists($p, $cur)) return [];
+        $cur = $cur[$p];
+    }
+    $out = [];
+
+    $walk = function($node) use ($out, &$walk) {
+        if ($node === null) return;
+        if (is_scalar($node)) {$s = (string)$node; if ($s !== '') $out[] = $s; return;}
+        if (is_array($node)) foreach ($node as $c) $walk($c);
+    };
+    $walk($cur);
+    return array_values(array_unique(array_map('strval', $out)));
+}
 ?>
