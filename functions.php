@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) exit;
 
 const SXI_OPT_PROFILE = 'sxi_profile';
 const SXI_CRON_HOOK = 'sxi_cron_event';
+const SXI_EXT_ID_KEY = '_sxi_external_item';
 
 add_action('admin_menu', function() {
     add_menu_page('XML Importer' ,'Xml Importer','manage_options','sxi-importer','sxi_admin_page','dashicons-database-import',26);
@@ -166,8 +167,45 @@ function sxi_xml_items($xml_string, $items_path) : array {
 function sxi_import(array $o): array {
     $xml = sxi_fetch($o ['feed_url']);
     if (!$xml) return ['ok'=>false,'reason'=>'fetch failed'];
+    
     $items = sxi_xml_items($xml, $o['items_path']);
-    return ['ok'=>true, 'count'=>count($items)];
+    if (empty($items)) return ['ok'=>false, 'reason'=>'no items'];
+
+    $post_type = post_type_exists(&o['post_type']) : 'post';
+    $created = $updated = $skipped = 0;
+
+    foreach ($items as $it) {
+        $ext = sxi_first($it, $o['id_path']);
+        if (!$ext) {$skipped++; continue; }
+
+        $title = (string)(sxi_first($it, $o['title_path']) ?? 'Untitles');
+        $content = (string)(sxi_first($it, $o['content_path']) ?? '');
+
+        $post_id = sxi_find_post($ext, $post_type);
+
+        if (!$post_id) {
+            $post_id = wp_insert_post([
+                'post_type' => $post_type,
+                'post_status' => in_array(($o['post_status'] ?? 'draft'), ['draft','publish'], true) ? $o['post_status'] : 'draft',
+                'post_title' => wp_strip_all($title),
+                'post_content' => wp_kses_post($content),
+            ], true);
+
+            if (is_wp_error($post_id)) {$skipped++; continue;}
+            update_post_meta($post_id), SXI_EXT_ID_KEY, ((string)$ext);
+            $created++;
+        } else {
+            if (!empty($o['overwrite_title_content'])) {
+                wp_update_post([
+                    'ID' => $post_id,
+                    'post_title' => wp_strip_all_tags($title),
+                    'post_content' => wp_kses_post($content),
+                ]);
+            }
+            $updated++
+        }
+    }
+    return ['ok'=>true, 'created'=>$created, 'updated'=>$updated, 'skipped'=>$skipped, 'total'=>count($items)];
 }
 
 
@@ -186,9 +224,7 @@ function sxi_find_post($external_id, $post_type) : int {
         'posts_per_page' => 1,
         'fields' => 'ids',
         'no_found_rows' => true,
-        'meta_query' => [['key' => '_sxi_external_id', 'value' => (string)$external_id]],
-        
-
+        'meta_query' => [['key' => SXI_EXT_ID_KEY, 'value' => (string)$external_id]],
     ]);
     return $q->have_posts() ? (int)$q->posts[0] : 0;
 }
