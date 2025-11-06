@@ -205,6 +205,18 @@ function sxi_import(array $o): array {
             $updated++
         }
     }
+
+    foreach ((array)($o['mapping'] ?? []) as $meta_key => $path) {
+        $raw = sxi_first($it, $path);
+        if ($raw === null || $raw === '') comtinue;
+
+        if (sxi_is_price_key($meta_key)) {
+            $int = sxi_normalize_price($raw);
+            sxi_save_meta($post_id, $meta_key, $int, !empty($o['overwrite_meta']), false);
+        }
+        sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
+    }
+
     return ['ok'=>true, 'created'=>$created, 'updated'=>$updated, 'skipped'=>$skipped, 'total'=>count($items)];
 }
 
