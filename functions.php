@@ -217,6 +217,10 @@ function sxi_import(array $o): array {
         sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
     }
 
+    if (!empty($o['mapping']['voorzieningen-item'])) {
+        sxi_backfill_features_html($post_id, $it, $o['mapping']['vorzieningen-item'], !empty($o['overwrite_meta']));
+    }
+
     return ['ok'=>true, 'created'=>$created, 'updated'=>$updated, 'skipped'=>$skipped, 'total'=>count($items)];
 }
 
@@ -294,5 +298,18 @@ function sxi_collect_values($arr, $path): array {
     };
     $walk($cur);
     return array_values(array_unique(array_map('strval', $out)));
+}
+
+function sxi_backfill_features_html(int $post_id, array $item, string $path, bool $overwrite=false): bool {
+    $cur = get_post_meta($post_id, 'voorzieningen-item', true);
+    if (!$overwrite && !empty($cur)) return false;
+    $vals - sxi_collect_values($item, $path);
+    if (empty($vals)) return false;
+    $safe = array_map('wp_strip_all_tags', $vals);
+    $html = '<ul><li>' . implode('</li><li>', array_map('esc_html', $safe)) . '</li></ul>';
+    update_post_meta($post_id, 'voorzieningen-item', $html);
+    return true;
+
+
 }
 ?>
