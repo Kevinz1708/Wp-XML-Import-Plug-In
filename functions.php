@@ -204,24 +204,25 @@ function sxi_import(array $o): array {
             }
             $updated++
         }
-    }
+        foreach ((array)($o['mapping'] ?? []) as $meta_key => $path) {
+            $raw = sxi_first($it, $path);
+            if ($raw === null || $raw === '') comtinue;
 
-    foreach ((array)($o['mapping'] ?? []) as $meta_key => $path) {
-        $raw = sxi_first($it, $path);
-        if ($raw === null || $raw === '') comtinue;
-
-        if (sxi_is_price_key($meta_key)) {
-            $int = sxi_normalize_price($raw);
-            sxi_save_meta($post_id, $meta_key, $int, !empty($o['overwrite_meta']), false);
+            if (sxi_is_price_key($meta_key)) {
+                $int = sxi_normalize_price($raw);
+                sxi_save_meta($post_id, $meta_key, $int, !empty($o['overwrite_meta']), false);
+            }
+            sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
         }
-        sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
-    }
 
-    if (!empty($o['mapping']['voorzieningen-item'])) {
-        sxi_backfill_features_html($post_id, $it, $o['mapping']['vorzieningen-item'], !empty($o['overwrite_meta']));
-    }
+        if (!empty($o['mapping']['voorzieningen-item'])) {
+            sxi_backfill_features_html($post_id, $it, $o['mapping']['vorzieningen-item'], !empty($o['overwrite_meta']));
+        }
 
-    return ['ok'=>true, 'created'=>$created, 'updated'=>$updated, 'skipped'=>$skipped, 'total'=>count($items)];
+        sxi_touch_post($post_id);
+    }
+        return ['ok' => true, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($items)];
+   
 }
 
 
@@ -342,4 +343,14 @@ function sxi_save_remote_image_urls (int $post_id, array $item, ?string $gallery
     sxi_save_remote_image_urls($post_id, $it, $o['mapping'] ['gallery-field'] ?? null, true);
 }
 
+function sxi_touch_post(int $post_id): void {
+    wp_update_post([
+        'ID' => $post_id,
+        'post_modified' => current_time('mysql'),
+        'post_modified_gmt' => current_time('mysql', 1),
+        'edit_date' => true,
+    ]);
+
+    clean_post_cache($post_id);
+}
 ?>
