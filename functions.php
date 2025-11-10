@@ -312,4 +312,34 @@ function sxi_backfill_features_html(int $post_id, array $item, string $path, boo
 
 
 }
+
+const SXI_GALLERY_URLS = 'gallery-field';
+const SXI_GALLERY_HTML = 'gallery-html';
+
+function sxi_collect_image_urls($node): array {
+    $urls = [];
+    $walk = function($n) use ($walk, &$urls) {
+        if ($n === null) return;
+        if (is_string($n)) {if (filter_var($n, FILTER_VALIDATE_URL)) $urls[] = $n; return; }
+        if (is_array($n)) foreach ($n as $c) $walk($c);
+    };
+}
+
+function sxi_save_remote_image_urls (int $post_id, array $item, ?string $gallery_path = null, bool $also_html = true) : array {
+    $urls = sxi_collect_image_urls($item);
+    if (empty($urls) && $gallery_path) $urls = sxi_collect_values($item, $gallery_path);
+
+    if (empty($urls)) {
+        update_post_meta($post_id, SXI_GALLERY_URLS, []);
+        if ($also_html) update_post_meta($post_id, SXI_GALLERY_HTML, '');
+        return [];
+    }
+    update_post_meta($post_id, SXI_GALLERY_URLS, $urls);
+    if ($also_html) {
+        $lis = array_map(fn($u) => '<li><img src="'.esc_url($u).'" alt="" loading="lazy" decoding="async"></li>', $urls);
+        update_post_meta($post_id, SXI_GALLERY_HTML, '<ul class="sxi-remote-gallery">'.implode('', $lis). '</ul>');
+    }
+    sxi_save_remote_image_urls($post_id, $it, $o['mapping'] ['gallery-field'] ?? null, true);
+}
+
 ?>
