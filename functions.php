@@ -11,6 +11,18 @@ const SXI_OPT_PROFILE = 'sxi_profile';
 const SXI_CRON_HOOK = 'sxi_cron_event';
 const SXI_EXT_ID_KEY = '_sxi_external_item';
 
+add_filter('cron_shedules', function ($scheduless){
+    $prof = wp_parse_args(get_option(SXI_OPT_PROFILE, []), sxi_defaults());
+    $interval = max(300, (int)($prof['cron_minutes'] ?? 60) * 60);
+    $shedules['sxi_dynamic'] = [
+        'interval' => $interval,
+        'display' => sprintf('SXI dynamic (%d sec)' , $interval),
+    ];
+    return $shedules;
+});
+
+
+
 add_action('admin_menu', function () {
     add_menu_page('XML Importer', 'Xml Importer', 'manage_options', 'sxi-importer', 'sxi_admin_page', 'dashicons-database-import', 26);
 });
