@@ -2,7 +2,6 @@
 /**
  * Plugin Name: Single XML Property Importer
  * Description: Imports a single XML property from a feed.
- * Version: 0.1.0
  */
 
 if (!defined('ABSPATH')) exit;
@@ -42,13 +41,13 @@ function sxi_admin_page() {
     if (!empty($_POST['sxi_action'])) {
         check_admin_referer('sxi_nonce');
 
-        $p['feed_url'] = esc_url_raw(wp_unslash)($_POST['feed_url'] ?? '');
-        $p['items_path'] = sanitize_text_field(wp_unslash($_POST['items_path'] ?? ''));
-        $p['post_type'] = sanitize_text_field(wp_unslash($_POST['post_type'] ?? 'post'));
+        $p['feed_url']    = esc_url_raw(wp_unslash($_POST['feed_url'] ?? ''));
+        $p['items_path']  = sanitize_text_field(wp_unslash($_POST['items_path'] ?? ''));
+        $p['post_type']   = sanitize_text_field(wp_unslash($_POST['post_type'] ?? 'post'));
 
-        $p['id_path'] = sanitize_text_field(wp_unslash($_POST['id_path'] ?? 'id_path'));
-        $p['title_path'] = sanitize_text_field(wp_unslash($_POST['title_path'] ?? 'title_path'));
-        $p['content_path'] = sanitize_text_field(wp_unslash($_POST['content_path'] ?? 'content_path'));
+        $p['id_path']      = sanitize_text_field(wp_unslash($_POST['id_path'] ?? 'id'));
+        $p['title_path']   = sanitize_text_field(wp_unslash($_POST['title_path'] ?? 'title'));
+        $p['content_path'] = sanitize_text_field(wp_unslash($_POST['content_path'] ?? 'description'));
 
         $map_arr = json_decode(wp_unslash($_POST['mapping'] ?? '[]'), true);
         $p['mapping'] = is_array($map_arr) ? $map_arr : [];
@@ -160,25 +159,35 @@ function sxi_xml_items($xml_string, $items_path) : array {
         }
         $cur = $cur[$part];
     }
-    return isset($crr[0]) ? $cur : [$cur];
+    return isset($cur[0]) ? $cur : [$cur];
 }
 
 
 function sxi_import(array $o): array {
+
     $xml = sxi_fetch($o ['feed_url']);
     if (!$xml) return ['ok'=>false,'reason'=>'fetch failed'];
     
     $items = sxi_xml_items($xml, $o['items_path']);
     if (empty($items)) return ['ok'=>false, 'reason'=>'no items'];
 
-    $post_type = post_type_exists(&o['post_type']) : 'post';
+    $post_type = post_type_exists($o['post_type']) ? $o['post_type'] : 'post';
     $created = $updated = $skipped = 0;
 
-    foreach ($items as $it) {
-        $ext = sxi_first($it, $o['id_path']);
-        if (!$ext) {$skipped++; continue; }
+    $limit = (int)($o['max_items'] ?? 0);
+    $start = max(0, (int)($o['start_index'] ?? 0));
+    $total = count($items);
+    if ($start > 0 && $start < $total) $items = array_slice($items, $start);
+    $processed_this_batch = 0;
 
-        $title = (string)(sxi_first($it, $o['title_path']) ?? 'Untitles');
+    foreach ($items as $it) {
+
+        if (!empty($limit) && ($processed_this_batch) >= $limit) break;
+
+        $ext = sxi_first($it, $o['id_path']);
+        if (!$ext) {$skipped++; $processed_this_batch; continue; }
+
+        $title = (string)(sxi_first($it, $o['title_path']) ?? 'Untitled');
         $content = (string)(sxi_first($it, $o['content_path']) ?? '');
 
         $post_id = sxi_find_post($ext, $post_type);
@@ -187,12 +196,13 @@ function sxi_import(array $o): array {
             $post_id = wp_insert_post([
                 'post_type' => $post_type,
                 'post_status' => in_array(($o['post_status'] ?? 'draft'), ['draft','publish'], true) ? $o['post_status'] : 'draft',
-                'post_title' => wp_strip_all($title),
+                'post_title' => wp_strip_all_tags($title),
                 'post_content' => wp_kses_post($content),
             ], true);
 
-            if (is_wp_error($post_id)) {$skipped++; continue;}
-            update_post_meta($post_id), SXI_EXT_ID_KEY, ((string)$ext);
+            if (is_wp_error($post_id)) {$skipped++; $processed_this_batch++; continue; }
+
+            update_post_meta($post_id, SXI_EXT_ID_KEY, (string)$ext);
             $created++;
         } else {
             if (!empty($o['overwrite_title_content'])) {
@@ -202,27 +212,55 @@ function sxi_import(array $o): array {
                     'post_content' => wp_kses_post($content),
                 ]);
             }
-            $updated++
+            $updated++;
         }
+
         foreach ((array)($o['mapping'] ?? []) as $meta_key => $path) {
             $raw = sxi_first($it, $path);
             if ($raw === null || $raw === '') comtinue;
 
-            if (sxi_is_price_key($meta_key)) {
-                $int = sxi_normalize_price($raw);
+            if (function_exists('sxi_is_price_key') && sxi_is_price_key($meta_key)) {
+                $int = function_exists('sxi_normalize_price') ? sxi_normalize_price($raw) : $raw;
                 sxi_save_meta($post_id, $meta_key, $int, !empty($o['overwrite_meta']), false);
+            } else {
+                sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
             }
-            sxi_save_meta($post_id, $meta_key, $raw, !empty($o['overwrite_meta']), !empty($o['append_lists']));
-        }
+
+            if (!empty($o['mapping']['gallery-field'])) {
+                if (function_exists('sxi_save_remote_image_urls')) {
+                    sxi_save_remote_image_urls($post_id, $it, $o['mapping']['gallery-field'], true);
+                }
+            }
 
         if (!empty($o['mapping']['voorzieningen-item'])) {
             sxi_backfill_features_html($post_id, $it, $o['mapping']['vorzieningen-item'], !empty($o['overwrite_meta']));
         }
 
         sxi_touch_post($post_id);
+
+        $processed_this_batch++;
     }
-        return ['ok' => true, 'created' => $created, 'updated' => $updated, 'skipped' => $skipped, 'total' => count($items)];
+
+        if (!empty($o['auto_resume']) && $processed_this_batch > 0) {
+            $prof = get_option(SXI_OPT_PROFILE);
+            if (is_array($prof)) {
+                $new_start = $start + $processed_this_batch;
+                $prof['start_index'] = ($new_start >= $total) ? 0 : $new_start;
+                update_option(SXI_OPT_PROFILE, $prof, false);
+            }
+        }
+
+        return [
+            'ok' => true, 
+            'created' => $created, 
+            'updated' => $updated, 
+            'skipped' => $skipped, 
+            'start' => $start,
+            'total' => total,
+            'processed_this_batch' => $processed_this_batch,
+        ];
    
+    };
 }
 
 
@@ -319,16 +357,20 @@ const SXI_GALLERY_HTML = 'gallery-html';
 
 function sxi_collect_image_urls($node): array {
     $urls = [];
-    $walk = function($n) use ($walk, &$urls) {
+    $walk = function($n) use (&$walk, &$urls) {
         if ($n === null) return;
         if (is_string($n)) {if (filter_var($n, FILTER_VALIDATE_URL)) $urls[] = $n; return; }
         if (is_array($n)) foreach ($n as $c) $walk($c);
     };
+    $walk($node);
+    return array_values(array_unique($urls));
 }
 
 function sxi_save_remote_image_urls (int $post_id, array $item, ?string $gallery_path = null, bool $also_html = true) : array {
     $urls = sxi_collect_image_urls($item);
     if (empty($urls) && $gallery_path) $urls = sxi_collect_values($item, $gallery_path);
+
+    $urls = array_values(array_unique(array_filter($urls, 'strlen')));
 
     if (empty($urls)) {
         update_post_meta($post_id, SXI_GALLERY_URLS, []);
@@ -340,7 +382,7 @@ function sxi_save_remote_image_urls (int $post_id, array $item, ?string $gallery
         $lis = array_map(fn($u) => '<li><img src="'.esc_url($u).'" alt="" loading="lazy" decoding="async"></li>', $urls);
         update_post_meta($post_id, SXI_GALLERY_HTML, '<ul class="sxi-remote-gallery">'.implode('', $lis). '</ul>');
     }
-    sxi_save_remote_image_urls($post_id, $it, $o['mapping'] ['gallery-field'] ?? null, true);
+   return $urls;
 }
 
 function sxi_touch_post(int $post_id): void {
