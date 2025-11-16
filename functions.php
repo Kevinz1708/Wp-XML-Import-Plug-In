@@ -21,6 +21,17 @@ add_filter('cron_shedules', function ($scheduless){
     return $shedules;
 });
 
+function sxi_reschedule_cron(?array $profile = null): void {
+    $prof = $profile ?? wp_parse_args(get_option(SXI_OPT_PROFILE, []), sxi_defaults());
+    $ts = wp_next_scheduled(SXI_CRON_HOOK);
+    if ($ts) wp_unschedule_events($ts, SXI_CRON_HOOK);
+    if (!empty($prof['enable_cron'])) {
+        if (!wp_next_scheduled(SXI_CRON_HOOK)) {
+            wp_schedule_event(time() + 30, 'sxi_dynamic', SXI_CRON_HOOK)
+        }
+    }
+}
+
 
 
 add_action('admin_menu', function () {
